@@ -2,6 +2,7 @@ package cfig.bootimg
 
 import cfig.EnvironmentVerifier
 import cfig.Helper
+import cfig.Helper.Companion.check_call
 import cfig.dtb_util.DTC
 import cfig.io.Struct3.InputStreamExt.Companion.getInt
 import cfig.kernel_util.KernelExtractor
@@ -249,7 +250,7 @@ class Common {
             }
         }
 
-        fun unpackRamdisk(ramdisk: String, root: String) {
+        private fun unpackRamdisk(ramdisk: String, root: String) {
             val rootFile = File(root).apply {
                 if (exists()) {
                     log.info("Cleaning [$root] before ramdisk unpacking")
@@ -258,11 +259,8 @@ class Common {
                 mkdirs()
             }
 
-            DefaultExecutor().let { exe ->
-                exe.workingDirectory = rootFile
-                exe.execute(CommandLine.parse("cpio -i -m -F " + File(ramdisk).canonicalPath))
-                log.info(" ramdisk extracted : $ramdisk -> ${rootFile}")
-            }
+            ("cpio -idmv -F " + File(ramdisk).canonicalPath).check_call(rootFile.canonicalPath)
+            log.info(" ramdisk extracted : $ramdisk -> $rootFile")
         }
 
         fun probeHeaderVersion(fileName: String): Int {

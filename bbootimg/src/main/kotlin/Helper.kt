@@ -354,12 +354,27 @@ class Helper {
             log.info("Dumping data to $dumpFile done")
         }
 
-        fun String.check_call(): Boolean {
+        fun String.check_output(): String {
+            val outputStream = ByteArrayOutputStream()
+            log.info(this)
+            DefaultExecutor().let {
+                it.streamHandler = PumpStreamHandler(outputStream)
+                it.execute(CommandLine.parse(this))
+            }
+            log.info(outputStream.toString())
+            return outputStream.toString().trim()
+        }
+
+        fun String.check_call(inWorkdir: String? = null): Boolean {
             val ret: Boolean
             try {
                 val cmd = CommandLine.parse(this)
-                log.info(cmd.toString())
-                DefaultExecutor().execute(cmd)
+                log.run {
+                    info("CMD: $cmd, workDir: $inWorkdir")
+                }
+                val exec = DefaultExecutor()
+                inWorkdir?.let { exec.workingDirectory = File(it) }
+                exec.execute(cmd)
                 ret = true
             } catch (e: java.lang.IllegalArgumentException) {
                 log.error("$e: can not parse command: [$this]")
@@ -372,17 +387,6 @@ class Helper {
                 throw e
             }
             return ret
-        }
-
-        fun String.check_output(): String {
-            val outputStream = ByteArrayOutputStream()
-            log.info(this)
-            DefaultExecutor().let {
-                it.streamHandler = PumpStreamHandler(outputStream)
-                it.execute(CommandLine.parse(this))
-            }
-            log.info(outputStream.toString())
-            return outputStream.toString().trim()
         }
 
         private val log = LoggerFactory.getLogger("Helper")
