@@ -3,7 +3,7 @@ package cfig.packable
 import avb.AVBInfo
 import avb.blob.Footer
 import cfig.Avb
-import cfig.Helper
+import cfig.helper.Helper
 import cfig.bootimg.Common.Companion.probeHeaderVersion
 import cfig.bootimg.v2.BootV2
 import cfig.bootimg.v3.BootV3

@@ -1,9 +1,9 @@
 package cfig.bootimg
 
 import cfig.EnvironmentVerifier
-import cfig.Helper
-import cfig.Helper.Companion.check_call
 import cfig.dtb_util.DTC
+import cfig.helper.Helper
+import cfig.helper.Helper.Companion.check_call
 import cfig.io.Struct3.InputStreamExt.Companion.getInt
 import cfig.kernel_util.KernelExtractor
 import org.apache.commons.exec.CommandLine

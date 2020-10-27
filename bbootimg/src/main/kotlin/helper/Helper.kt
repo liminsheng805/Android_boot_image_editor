@@ -1,5 +1,6 @@
-package cfig
+package cfig.helper
 
+import cfig.KeyUtil
 import cfig.io.Struct3
 import com.google.common.math.BigIntegerMath
 import org.apache.commons.codec.binary.Hex
@@ -14,8 +15,11 @@ import org.slf4j.LoggerFactory
 import java.io.*
 import java.math.BigInteger
 import java.math.RoundingMode
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.security.MessageDigest
 import java.util.*
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
@@ -354,15 +358,11 @@ class Helper {
             log.info("Dumping data to $dumpFile done")
         }
 
-        fun String.check_output(): String {
-            val outputStream = ByteArrayOutputStream()
-            log.info(this)
-            DefaultExecutor().let {
-                it.streamHandler = PumpStreamHandler(outputStream)
-                it.execute(CommandLine.parse(this))
+        fun String.deleteIfExists() {
+            if (File(this).exists()) {
+                log.info("deleting $this")
+                File(this).delete()
             }
-            log.info(outputStream.toString())
-            return outputStream.toString().trim()
         }
 
         fun String.check_call(inWorkdir: String? = null): Boolean {
@@ -388,6 +388,130 @@ class Helper {
             }
             return ret
         }
+
+        fun String.check_output(): String {
+            val outputStream = ByteArrayOutputStream()
+            log.info(this)
+            DefaultExecutor().let {
+                it.streamHandler = PumpStreamHandler(outputStream)
+                it.execute(CommandLine.parse(this))
+            }
+            log.info(outputStream.toString())
+            return outputStream.toString().trim()
+        }
+
+        fun String.pumpRun(): Array<ByteArrayOutputStream> {
+            val outStream = ByteArrayOutputStream()
+            val errStream = ByteArrayOutputStream()
+            log.info("CMD: $this")
+            DefaultExecutor().let {
+                it.streamHandler = PumpStreamHandler(outStream, errStream)
+                it.execute(CommandLine.parse(this))
+            }
+            log.info("stdout [$outStream]")
+            log.info("stderr [$errStream]")
+            return arrayOf(outStream, errStream)
+        }
+
+        fun powerRun3(cmdline: CommandLine, inputStream: InputStream?): Array<Any> {
+            var ret = true
+            val outStream = ByteArrayOutputStream()
+            val errStream = ByteArrayOutputStream()
+            log.info("CMD: $cmdline")
+            try {
+                DefaultExecutor().let {
+                    it.streamHandler = PumpStreamHandler(outStream, errStream, inputStream)
+                    it.execute(cmdline)
+                }
+            } catch (e: ExecuteException) {
+                log.error("fail to execute [${cmdline}]")
+                ret = false
+            }
+            log.debug("stdout [$outStream]")
+            log.debug("stderr [$errStream]")
+            return arrayOf(ret, outStream.toByteArray(), errStream.toByteArray())
+        }
+
+        fun powerRun2(cmd: String, inputStream: InputStream?): Array<Any> {
+            var ret = true
+            val outStream = ByteArrayOutputStream()
+            val errStream = ByteArrayOutputStream()
+            log.info("CMD: $cmd")
+            try {
+                DefaultExecutor().let {
+                    it.streamHandler = PumpStreamHandler(outStream, errStream, inputStream)
+                    it.execute(CommandLine.parse(cmd))
+                }
+            } catch (e: ExecuteException) {
+                log.error("fail to execute [$cmd]")
+                ret = false
+            }
+            log.debug("stdout [$outStream]")
+            log.debug("stderr [$errStream]")
+            return arrayOf(ret, outStream.toByteArray(), errStream.toByteArray())
+        }
+
+        fun powerRun(cmd: String, inputStream: InputStream?): Array<ByteArray> {
+            val outStream = ByteArrayOutputStream()
+            val errStream = ByteArrayOutputStream()
+            log.info("CMD: $cmd")
+            try {
+                DefaultExecutor().let {
+                    it.streamHandler = PumpStreamHandler(outStream, errStream, inputStream)
+                    it.execute(CommandLine.parse(cmd))
+                }
+            } catch (e: ExecuteException) {
+                log.error("fail to execute [$cmd]")
+            }
+            log.debug("stdout [$outStream]")
+            log.debug("stderr [$errStream]")
+            return arrayOf(outStream.toByteArray(), errStream.toByteArray())
+        }
+
+        fun hashFileAndSize(vararg inFiles: String?): ByteArray {
+            val md = MessageDigest.getInstance("SHA1")
+            for (item in inFiles) {
+                if (null == item) {
+                    md.update(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+                            .putInt(0)
+                            .array())
+                    log.debug("update null $item: " + toHexString((md.clone() as MessageDigest).digest()))
+                } else {
+                    val currentFile = File(item)
+                    FileInputStream(currentFile).use { iS ->
+                        var byteRead: Int
+                        val dataRead = ByteArray(1024)
+                        while (true) {
+                            byteRead = iS.read(dataRead)
+                            if (-1 == byteRead) {
+                                break
+                            }
+                            md.update(dataRead, 0, byteRead)
+                        }
+                        log.debug("update file $item: " + toHexString((md.clone() as MessageDigest).digest()))
+                        md.update(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+                                .putInt(currentFile.length().toInt())
+                                .array())
+                        log.debug("update SIZE $item: " + toHexString((md.clone() as MessageDigest).digest()))
+                    }
+                }
+            }
+
+            return md.digest()
+        }
+
+        fun assertFileEquals(file1: String, file2: String) {
+            val hash1 = hashFileAndSize(file1)
+            val hash2 = hashFileAndSize(file2)
+            log.info("$file1 hash ${toHexString(hash1)}, $file2 hash ${toHexString(hash2)}")
+            if (hash1.contentEquals(hash2)) {
+                log.info("Hash verification passed: ${toHexString(hash1)}")
+            } else {
+                log.error("Hash verification failed")
+                throw UnknownError("Do not know why hash verification fails, maybe a bug")
+            }
+        }
+
 
         private val log = LoggerFactory.getLogger("Helper")
     }

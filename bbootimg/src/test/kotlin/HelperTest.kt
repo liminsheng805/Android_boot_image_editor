@@ -1,10 +1,10 @@
 import avb.alg.Algorithms
-import cfig.Helper
 import cfig.KeyUtil
+import cfig.helper.Helper
 import com.google.common.math.BigIntegerMath
 import org.apache.commons.codec.binary.Hex
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -17,10 +17,6 @@ import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
-import java.security.spec.RSAPublicKeySpec
-import java.security.PublicKey
-import java.security.spec.RSAPrivateKeySpec
-import java.security.PrivateKey
 
 
 @OptIn(ExperimentalUnsignedTypes::class)
