@@ -19,6 +19,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import java.util.*
 import java.util.zip.GZIPInputStream
@@ -93,138 +94,6 @@ class Helper {
                 i += 2
             }
             return data
-        }
-
-        fun isGZ(compressedFile: String): Boolean {
-            return try {
-                GZIPInputStream(FileInputStream(compressedFile)).use { }
-                true
-            } catch (e: ZipException) {
-                false
-            }
-        }
-
-        fun isXZ(compressedFile: String): Boolean {
-            return try {
-                XZCompressorInputStream(FileInputStream(compressedFile)).use { }
-                true
-            } catch (e: ZipException) {
-                false
-            }
-        }
-
-        fun isLZ4(compressedFile: String): Boolean {
-            return try {
-                "lz4 -t $compressedFile".check_call()
-                true
-            } catch (e: Exception) {
-                false
-            }
-        }
-
-        fun decompressLZ4(lz4File: String, outFile: String) {
-            "lz4 -d -fv $lz4File $outFile".check_call()
-        }
-
-        fun compressLZ4(lz4File: String, inputStream: InputStream) {
-            val fos = FileOutputStream(File(lz4File))
-            val baosE = ByteArrayOutputStream()
-            DefaultExecutor().let { exec ->
-                exec.streamHandler = PumpStreamHandler(fos, baosE, inputStream)
-                val cmd = CommandLine.parse("lz4 -l -12 --favor-decSpeed")
-                log.info(cmd.toString())
-                exec.execute(cmd)
-            }
-            baosE.toByteArray().let {
-                if (it.isNotEmpty()) {
-                    log.warn(String(it))
-                }
-            }
-            fos.close()
-        }
-
-        @Throws(IOException::class)
-        fun gnuZipFile(compressedFile: String, decompressedFile: String) {
-            val buffer = ByteArray(1024)
-            FileOutputStream(compressedFile).use { fos ->
-                GZIPOutputStream(fos).use { gos ->
-                    FileInputStream(decompressedFile).use { fis ->
-                        var bytesRead: Int
-                        while (true) {
-                            bytesRead = fis.read(buffer)
-                            if (bytesRead <= 0) break
-                            gos.write(buffer, 0, bytesRead)
-                        }
-                        gos.finish()
-                        log.info("gzip done: $decompressedFile -> $compressedFile")
-                    }//file-input-stream
-                }//gzip-output-stream
-            }//file-output-stream
-        }
-
-        @Throws(IOException::class)
-        fun unGnuzipFile(compressedFile: String, decompressedFile: String) {
-            val buffer = ByteArray(1024)
-            FileInputStream(compressedFile).use { fileIn ->
-                //src
-                GZIPInputStream(fileIn).use { gZIPInputStream ->
-                    //src
-                    FileOutputStream(decompressedFile).use { fileOutputStream ->
-                        var bytesRead: Int
-                        while (true) {
-                            bytesRead = gZIPInputStream.read(buffer)
-                            if (bytesRead <= 0) break
-                            fileOutputStream.write(buffer, 0, bytesRead)
-                        }
-                        log.info("decompress(gz) done: $compressedFile -> $decompressedFile")
-                    }
-                }
-            }
-        }
-
-        /*
-            caution: about gzip header - OS (Operating System)
-
-            According to https://docs.oracle.com/javase/8/docs/api/java/util/zip/package-summary.html and
-            GZIP spec RFC-1952(http://www.ietf.org/rfc/rfc1952.txt), gzip files created from java.util.zip.GZIPOutputStream
-            will mark the OS field with
-                0 - FAT filesystem (MS-DOS, OS/2, NT/Win32)
-            But default image built from Android source code has the OS field:
-                3 - Unix
-            This MAY not be a problem, at least we didn't find it till now.
-         */
-        @Throws(IOException::class)
-        @Deprecated("this function misses features")
-        fun gnuZipFile(compressedFile: String, fis: InputStream) {
-            val buffer = ByteArray(1024)
-            FileOutputStream(compressedFile).use { fos ->
-                GZIPOutputStream(fos).use { gos ->
-                    var bytesRead: Int
-                    while (true) {
-                        bytesRead = fis.read(buffer)
-                        if (bytesRead <= 0) break
-                        gos.write(buffer, 0, bytesRead)
-                    }
-                    log.info("compress(gz) done: $compressedFile")
-                }
-            }
-        }
-
-        fun gnuZipFile2(compressedFile: String, fis: InputStream) {
-            val buffer = ByteArray(1024)
-            val p = GzipParameters()
-            p.operatingSystem = 3
-            FileOutputStream(compressedFile).use { fos ->
-                GzipCompressorOutputStream(fos, p).use { gos ->
-                    var bytesRead: Int
-                    while (true) {
-                        bytesRead = fis.read(buffer)
-                        if (bytesRead <= 0) break
-                        gos.write(buffer, 0, bytesRead)
-                    }
-                    log.info("compress(gz) done: $compressedFile")
-                }
-            }
         }
 
         fun extractFile(fileName: String, outImgName: String, offset: Long, length: Int) {
@@ -510,6 +379,26 @@ class Helper {
                 log.error("Hash verification failed")
                 throw UnknownError("Do not know why hash verification fails, maybe a bug")
             }
+        }
+
+        fun modeToPermissions(mode: Int): Set<PosixFilePermission> {
+            var mode = mode
+            val PERMISSIONS_MASK = 4095
+            // setgid/setuid/sticky are not supported.
+            val MAX_SUPPORTED_MODE = 511
+            mode = mode and PERMISSIONS_MASK
+            if (mode and MAX_SUPPORTED_MODE != mode) {
+                throw IOException("Invalid mode: $mode")
+            }
+            val allPermissions = PosixFilePermission.values()
+            val result: MutableSet<PosixFilePermission> = EnumSet.noneOf(PosixFilePermission::class.java)
+            for (i in allPermissions.indices) {
+                if (mode and 1 == 1) {
+                    result.add(allPermissions[allPermissions.size - i - 1])
+                }
+                mode = mode shr 1
+            }
+            return result
         }
 
 

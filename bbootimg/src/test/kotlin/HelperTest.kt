@@ -1,26 +1,37 @@
 import avb.alg.Algorithms
 import cfig.KeyUtil
 import cfig.helper.Helper
+import cfig.helper.ZipHelper
 import com.google.common.math.BigIntegerMath
 import org.apache.commons.codec.binary.Hex
+import org.apache.commons.compress.archivers.cpio.CpioArchiveInputStream
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.slf4j.LoggerFactory
+import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 import java.math.BigInteger
 import java.math.RoundingMode
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.Security
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
+import java.util.*
 import javax.crypto.Cipher
 
 
 @OptIn(ExperimentalUnsignedTypes::class)
 class HelperTest {
+    private val log = LoggerFactory.getLogger(HelperTest::class.java)
+
     @Test
     fun rawSignTest() {
         val data = Hex.decodeHex("0001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff003031300d0609608648016503040201050004206317a4c8d86accc8258c1ac23ef0ebd18bc33010d7afb43b241802646360b4ab")
